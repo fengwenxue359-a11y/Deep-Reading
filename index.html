@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>每日深读</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root { --primary: #2C3E50; --accent: #e74c3c; --bg: #f9f9f9; --card: #ffffff; --text: #333; }
+        body { font-family: "Georgia", "Times New Roman", "Songti SC", serif; background: var(--bg); margin: 0; padding: 0; color: var(--text); line-height: 1.8; }
+        header { background: var(--card); padding: 15px 20px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
+        header h1 { font-size: 20px; margin: 0; font-weight: bold; color: var(--primary); }
+        select { padding: 5px 10px; border-radius: 5px; border: 1px solid #ddd; font-size: 14px; background: #fff; }
+        
+        .container { padding: 20px; max-width: 700px; margin: 0 auto; }
+        .article { background: var(--card); border-radius: 4px; padding: 30px; margin-bottom: 30px; box-shadow: 0 2px 15px rgba(0,0,0,0.03); }
+        
+        .meta { font-size: 13px; color: #999; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+        .title { font-size: 26px; font-weight: bold; margin: 0 0 20px 0; color: #1a1a1a; font-family: "Helvetica Neue", Arial, sans-serif; }
+        
+        /* 主编导读 */
+        .intro-box { background: #f0f4f8; border-left: 4px solid var(--primary); padding: 15px 20px; margin-bottom: 25px; font-style: italic; color: #444; border-radius: 0 8px 8px 0; font-family: "Helvetica Neue", Arial, sans-serif; }
+        .intro-box strong { color: var(--primary); display: block; margin-bottom: 5px; font-style: normal; }
+        
+        /* 核心观点 */
+        .core-points { background: #fff9f0; border: 1px dashed #f39c12; border-radius: 8px; padding: 15px 20px; margin-bottom: 30px; font-family: "Helvetica Neue", Arial, sans-serif; }
+        .core-points h3 { margin: 0 0 10px 0; color: #e67e22; font-size: 16px; }
+        .core-points ul { margin: 0; padding-left: 20px; }
+        .core-points li { margin-bottom: 8px; font-size: 15px; color: #333; }
+        
+        /* 金句 */
+        .golden-quote { text-align: center; font-size: 18px; color: var(--accent); margin: 30px 0; padding: 20px; border-top: 1px solid #eee; border-bottom: 1px solid #eee; font-weight: bold; }
+        .golden-quote span { display: block; font-size: 14px; color: #888; margin-top: 10px; font-weight: normal; }
+        
+        /* 全文 */
+        .full-text { font-size: 17px; color: #2c3e50; margin-top: 30px; }
+        .full-text p { margin-bottom: 20px; text-indent: 2em; }
+        
+        .source-link { display: inline-block; margin-top: 20px; font-size: 14px; color: var(--primary); text-decoration: underline; font-family: "Helvetica Neue", Arial, sans-serif; }
+
+        /* 笔记区 */
+        .note-section { background: var(--card); border-radius: 4px; padding: 25px; margin-top: 20px; box-shadow: 0 2px 15px rgba(0,0,0,0.03); font-family: "Helvetica Neue", Arial, sans-serif; }
+        textarea { width: 100%; height: 120px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; resize: none; box-sizing: border-box; font-family: inherit; }
+        button { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; font-size: 15px; margin-top: 10px; cursor: pointer; width: 100%; }
+        .loading { text-align: center; color: #888; padding: 50px 0; font-family: sans-serif;}
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📖 每日深读</h1>
+        <select id="historySelect"><option value="latest">今日</option></select>
+    </header>
+
+    <div class="container" id="content">
+        <div class="loading">正在加载今天的深度长文...</div>
+    </div>
+
+    <div class="container">
+        <div class="note-section">
+            <h2>📝 我的读后笔记</h2>
+            <textarea id="noteInput" placeholder="读完今天的文章，留下你的思考..."></textarea>
+            <button onclick="saveNote()">保存笔记</button>
+            <p id="saveStatus" style="color: var(--primary); text-align: center; display: none; font-size: 13px;">✔ 已保存</p>
+        </div>
+    </div>
+
+    <script>
+        if ('serviceWorker' in navigator) { navigator.serviceWorker.register('./sw.js').catch(console.error); }
+
+        async function loadData(dateParam = 'latest') {
+            const contentDiv = document.getElementById('content');
+            contentDiv.innerHTML = '<div class="loading">正在加载深度长文...</div>';
+            const url = dateParam === 'latest' ? './briefs/latest.json' : `./briefs/archive/${dateParam}.json`;
+
+            try {
+                const response = await fetch(`${url}?t=${new Date().getTime()}`);
+                if (!response.ok) throw new Error("数据未生成");
+                const data = await response.json();
+                
+                let html = '';
+                data.items.forEach(item => {
+                    html += `
+                        <div class="article">
+                            <div class="meta">${item.source} · ${data.date}</div>
+                            <h1 class="title">${item.title_cn}</h1>
+                            
+                            <div class="intro-box">
+                                <strong>主编导读</strong>
+                                ${item.intro}
+                            </div>
+
+                            <div class="core-points">
+                                <h3>💡 核心观点</h3>
+                                <ul>
+                                    ${item.core_points.map(p => `<li>${p}</li>`).join('')}
+                                </ul>
+                            </div>
+
+                            <div class="golden-quote">
+                                "${item.golden_quote}"
+                            </div>
+
+                            <div class="full-text">
+                                ${item.full_text_cn.split('\n').map(p => `<p>${p}</p>`).join('')}
+                            </div>
+
+                            <a class="source-link" href="${item.original_link}" target="_blank">阅读英文原文 →</a>
+                        </div>
+                    `;
+                });
+                contentDiv.innerHTML = html;
+                loadNote(dateParam);
+            } catch (error) { 
+                contentDiv.innerHTML = `<div class="loading" style="color:red;">⚠️ 加载失败：${error.message}</div>`; 
+            }
+        }
+
+        async function loadHistoryList() {
+            try {
+                const response = await fetch(`./briefs/history.json?t=${new Date().getTime()}`);
+                const history = await response.json();
+                const select = document.getElementById('historySelect');
+                history.forEach(date => { 
+                    const option = document.createElement('option'); 
+                    option.value = date; 
+                    option.text = date; 
+                    select.appendChild(option); 
+                });
+            } catch (e) { console.log("暂无历史记录"); }
+        }
+
+        let currentDate = 'latest';
+        function loadNote(date) { 
+            currentDate = date; 
+            document.getElementById('noteInput').value = localStorage.getItem(`deep_${date}`) || ''; 
+        }
+        
+        function saveNote() { 
+            localStorage.setItem(`deep_${currentDate}`, document.getElementById('noteInput').value); 
+            const status = document.getElementById('saveStatus'); 
+            status.style.display = 'block'; 
+            setTimeout(() => { status.style.display = 'none'; }, 2000); 
+        }
+
+        document.getElementById('historySelect').addEventListener('change', (e) => { loadData(e.target.value); });
+        loadHistoryList();
+        loadData('latest');
+    </script>
+</body>
+</html>
